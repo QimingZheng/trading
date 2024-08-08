@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 import plotly.express as px
 import datetime
+import matplotlib.pyplot as plt
 
 
 class Duration:
@@ -116,13 +117,20 @@ class YahooFinanceApi:
 # # data available via: opt.calls, opt.puts
 
 st.set_page_config(layout="wide")
+st.write(
+    """
+# Manage Your Portfolio
+"""
+)
 
-
-chart_col, menu_col = st.columns([5, 1])
-
-with menu_col:
+with st.sidebar:
+    selected_stocks = st.multiselect(
+        "Choose Stocks",
+        ["GOOG", "^SPX", "000001.SS", "^IXIC", "AAPL", "^N225"],
+        ["GOOG", "^SPX"],
+    )
     selected_duration = st.selectbox(
-        "Date Range",
+        "Time Range",
         [
             Duration().ONE_DAY,
             Duration().FIVE_DAY,
@@ -135,33 +143,40 @@ with menu_col:
             Duration().TEN_YEAR,
             Duration().MAX,
         ],
-    )
-    selected_stocks = st.multiselect(
-        "Choose Stocks",
-        ["GOOG", "^SPX", "000001.SS", "^IXIC", "AAPL", "^N225"],
-        ["GOOG"],
+        index=1,
     )
 
 
-with chart_col:
-    api = YahooFinanceApi()
-    prices = []
-    for stock_code in selected_stocks:
-        prices.append((stock_code, api.get_stock_price(stock_code, selected_duration)))
+api = YahooFinanceApi()
+prices = []
+for stock_code in selected_stocks:
+    prices.append((stock_code, api.get_stock_price(stock_code, selected_duration)))
 
-    fig = px.line()
+fig = px.line()
 
-    for price in prices:
-        stock_code = price[0]
-        stock_price = price[1]
-        fig.add_scatter(
-            x=stock_price.index,
-            y=stock_price[StockMetric().CLOSE]
-            * 1.0
-            / stock_price[StockMetric().CLOSE][0],
-            mode="lines",
-            name=stock_code,
-        )
-    fig.update_layout(xaxis_title="Date", yaxis_title="Price")
+for price in prices:
+    stock_code = price[0]
+    stock_price = price[1]
+    fig.add_scatter(
+        x=stock_price.index,
+        y=stock_price[StockMetric().CLOSE] * 1.0 / stock_price[StockMetric().CLOSE][0],
+        mode="lines",
+        name=stock_code,
+    )
+fig.update_layout(xaxis_title="Date", yaxis_title="Price")
 
-    st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
+
+
+def correlation_table(stock_codes, prices):
+    df_col = pd.DataFrame({code: price for code, price in zip(stock_codes, prices)})
+    df_corr = df_col.corr()
+    st.write(df_corr)
+    plt.matshow(df_col.corr())
+
+
+st.write("## Correlations")
+
+correlation_table(
+    [price[0] for price in prices], [price[1][StockMetric().CLOSE] for price in prices]
+)
