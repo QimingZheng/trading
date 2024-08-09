@@ -116,6 +116,11 @@ class YahooFinanceApi:
 # # opt = msft.option_chain('YYYY-MM-DD')
 # # data available via: opt.calls, opt.puts
 
+
+def normalize_price_df(df):
+    return df / df[0]
+
+
 st.set_page_config(layout="wide")
 st.write(
     """
@@ -126,7 +131,7 @@ st.write(
 with st.sidebar:
     selected_stocks = st.multiselect(
         "Choose Stocks",
-        ["GOOG", "^SPX", "000001.SS", "^IXIC", "AAPL", "^N225"],
+        ["GOOG", "^SPX", "000001.SS", "^IXIC", "AAPL", "^N225", "NVDA", "^HSI"],
         ["GOOG", "^SPX"],
     )
     selected_duration = st.selectbox(
@@ -159,7 +164,7 @@ for price in prices:
     stock_price = price[1]
     fig.add_scatter(
         x=stock_price.index,
-        y=stock_price[StockMetric().CLOSE] * 1.0 / stock_price[StockMetric().CLOSE][0],
+        y=normalize_price_df(stock_price[StockMetric().CLOSE]),
         mode="lines",
         name=stock_code,
     )
@@ -168,15 +173,50 @@ fig.update_layout(xaxis_title="Date", yaxis_title="Price")
 st.plotly_chart(fig, use_container_width=True)
 
 
-def correlation_table(stock_codes, prices):
-    df_col = pd.DataFrame({code: price for code, price in zip(stock_codes, prices)})
-    df_corr = df_col.corr()
-    st.write(df_corr)
-    plt.matshow(df_col.corr())
+correlation_tab, mean_tab, std_tab = st.columns([1, 1, 1])
+
+with correlation_tab:
+    st.header("Correlation")
+
+    def correlation_table(stock_codes, prices):
+        df_col = pd.DataFrame({code: price for code, price in zip(stock_codes, prices)})
+        df_corr = df_col.corr()
+        st.write(df_corr)
+        plt.matshow(df_col.corr())
+
+    correlation_table(
+        [price[0] for price in prices],
+        [normalize_price_df(price[1][StockMetric().CLOSE]) - 1.0 for price in prices],
+    )
 
 
-st.write("## Correlations")
+with mean_tab:
+    st.header("Mean")
 
-correlation_table(
-    [price[0] for price in prices], [price[1][StockMetric().CLOSE] for price in prices]
-)
+    def mean_table(stock_codes, price_deltas):
+        df_col = pd.DataFrame(
+            {code: price for code, price in zip(stock_codes, price_deltas)}
+        )
+        df_mean = df_col.mean()
+        st.write(df_mean)
+
+    mean_table(
+        [price[0] for price in prices],
+        [normalize_price_df(price[1][StockMetric().CLOSE]) - 1.0 for price in prices],
+    )
+
+
+with std_tab:
+    st.header("Standard Variance")
+
+    def standard_variance_table(stock_codes, price_deltas):
+        df_col = pd.DataFrame(
+            {code: price for code, price in zip(stock_codes, price_deltas)}
+        )
+        df_std = df_col.std()
+        st.write(df_std)
+
+    standard_variance_table(
+        [price[0] for price in prices],
+        [normalize_price_df(price[1][StockMetric().CLOSE]) - 1.0 for price in prices],
+    )
